@@ -16,15 +16,27 @@ interface Task {
 }
 
 export default function TaskList() {
-    const [tasks, setTasks] = useState < Task[] > ([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [perPage] = useState<number>(5); // عدد المهام لكل صفحة
+    const [totalPages, setTotalPages] = useState<number>(1);
 
+    const token = localStorage.getItem("token");
+
+    // جلب المهام مع Pagination و Filtering
     const loadTasks = async () => {
-        const token = localStorage.getItem("token");
         try {
             const res = await api.get("/tasks", {
                 headers: { Authorization: `Bearer ${token}` },
+                params: {
+                    page: currentPage,
+                    status: statusFilter !== "all" ? statusFilter : undefined,
+                },
             });
-            setTasks(res.data.data);
+
+            setTasks(res.data.data); // البيانات حسب API
+            setTotalPages(res.data.last_page || 1); // اجعل API يعيد last_page
         } catch (err) {
             console.error(err);
         }
@@ -33,7 +45,6 @@ export default function TaskList() {
     const deleteTask = async (id: number) => {
         if (!window.confirm("Are you sure you want to delete this task?")) return;
 
-        const token = localStorage.getItem("token");
         try {
             await api.delete(`/tasks/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -47,11 +58,31 @@ export default function TaskList() {
 
     useEffect(() => {
         loadTasks();
-    }, []);
+    }, [currentPage, statusFilter]);
+
+    // تغيير الصفحة
+    const changePage = (page: number) => {
+        if (page < 1 || page > totalPages) return;
+        setCurrentPage(page);
+    };
 
     return (
         <div className="task-container">
             <h2>Your Tasks</h2>
+
+            {/* Filter by Status */}
+            <div className="filter">
+                <label>Filter by status: </label>
+                <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                    <option value="all">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="done">Done</option>
+                </select>
+            </div>
 
             <a href="/tasks/create" className="add-btn">
                 + Add Task
@@ -80,6 +111,15 @@ export default function TaskList() {
                     </li>
                 ))}
             </ul>
+
+            {/* Pagination */}
+            <div className="pagination">
+                <button onClick={() => changePage(currentPage - 1)}>Prev</button>
+                <span>
+                    Page {currentPage} of {totalPages}
+                </span>
+                <button onClick={() => changePage(currentPage + 1)}>Next</button>
+            </div>
         </div>
     );
 }
